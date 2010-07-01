@@ -1,0 +1,202 @@
+= read_filepro for Python =
+
+Python source for extracting map, key, and data records from an ancient filePro 
+database. Reads the raw files so a copy of filePro is not required. 
+
+Copyright Jim Storch, 2010. 
+Released under the Apache 2.0 LICENSE
+
+Contact info: jimstorch then that amper thingy symbol then gmail and then the
+TLD for commercial entities.
+
+
+== Background ==
+
+FIRST: Copy your data and only work with a disposable copy!
+
+Recently, I was asked to extract the data from over four hundred filePro
+databases created by an office over a nine year period.  To hopefully spare
+someone else this hassle, I'm posting my findings and code.  I copied 544mb in 
+filePro stuff and ended up with 109mb in .CSV files.  They were using filePro
+version 5.0.09, however, I did not use filePro itself for any step of this
+conversion.
+
+I'm capitalizing for discussion only.  The code expects all filenames to be in
+lowercase. My coding/conversion platform was Linux using Python 2.6.  I did not
+have access to the filePro application itself.
+
+Filepro is not the same thing as F,I,L,E,M,A,K,E,R, ,P,R,O.  I'll try not to
+waylay googlers.  
+
+
+== filePro ==
+
+Filepro stores data in three files; MAP, DATA, and KEY.  
+
+There are other files for indexing, screens, and whatnot.  We don't care, our
+goal is get the data out.
+       
+
+=== Map Files ===
+
+You could call this the schema.  The first line holds six segments separated by
+colons.  Here they are;
+
+    1.  The string literal 'map'.  If it starts with 'Alien:' then it's some
+        kind of external data reference (??).  I had two and ignored them.
+    2.  The size in bytes of one record in the KEY file.  If the record 
+        represents five fields that are 10 bytes wide, this would be 50.
+        Note that filepro tacks on a 20 byte header to each record in the
+        KEY file, so the real KEY record size would be 70.
+    3.  The size in bytes of one record in the DATA file.  No header.  May be
+        zero if all columns are kept in the KEY file.
+    4.  Number of fields that are in the KEY file.  All fields beyond this
+        count are kept in the DATA file.
+    5.  Eight byte checksum for the encoded password.  We don't care.
+    6.  The encoded password.  Again, we don't care.  It's only used by filePro
+        to permit changes.  All the actual data is in cleartext.
+
+The second through last lines contain details of each column in the database.
+Again, columns are usually broken across the KEY and DATA files.
+
+Each line contains three segments separated by colons:
+
+    1.  The name of the fiels.  Sometimes empty, sometimes has weird 
+        characters.
+    2.  The width in bytes of the field. Sometimes empty for dummy or
+        placeholder fields.  Not really sure why.  I ignored all fields with
+        a blank width.
+    3.  The edit type.  I think this is used by filePro when validating a
+        field value.  Seemed ok to ignore since everything was stored as
+        non-terminated ASCII sequences, even numbers.       
+    
+Ref: https://www.fptech.com/Products/Docs/FPFormat/ftmap.shtml
+
+
+=== Key Files ===
+
+The KEY file is a flat file.  It should always be recount_count * record_size
+long.  The record size is the width of all the key fields plus a 20 byte
+'deleted' and 'used' headers. 
+
+The only byte in the header I care about is at offset 0:
+    0x00 = this is a deleted record
+    0x01 = this is an active record
+
+The database column in the KEY file are apparently those that filePro has built
+indexes for.  All other columns are stored in the DATA file.  It is possible
+for all columns to be in KEY and have a DATA file 0 bytes long.
+
+Filepro does not shrink the file as you deleted records.  It maintains a
+chain of deleted records as uses those as slots for saving new ones. 
+       
+Ref: https://www.fptech.com/Products/Docs/FPFormat/ftkey.shtml
+
+
+=== Data Files ===
+
+As stated above, the DATA files seems to be "other half" of the fields outlined
+in the MAP file -- that that are not indexed(?).  It's a flatfile that seems
+to match the KEY file record for record (in matching order) but does not use a
+record header so it's length is equal to ((sum of field widths) * number of 
+records)). 
+
+If all columns are indexed, then the map file is empty because all columns are
+in KEY.
+
+
+== DOS/UNIX Line Endings ==
+
+WARNING: This is not a step.  If you don't understand what I'm talking about,
+don't do this.
+
+I was lucky enough to find the FTP daemon running on the SCO box I needed to
+grab data from.  I copied the entire filePro directory to a Windows PC and then
+burned it to CD.  Sadly, I forgot to set the mode to binary and most of my KEY
+files got messed up because Filezilla was trying to convert line endings from
+UNIX to DOS/Windows style.
+
+It took me a while to realize because I was also trying to figure out how 
+filePro stored its data. Some of the files were evenly divisible by record
+size and some weren't.    
+
+I was able to fix some using the 'flip' utility:
+
+$ sudo apt-get install flip
+$ flip -u -b -v appl/filepro/A_FOLDER/key
+
+If you have a bunch, you can batch convert them with:
+
+$ cd appl
+$ find . -name key -exec flip -u -b -v {} \;
+
+My success rate was about around 75%.  We ended up re-FTP'ing the files in
+binary mode and all worked fine.
+
+
+== The Code ==
+
+First, a couple disclaimers:
+
+* Copy your data and only work with a disposable copy!
+* Do not run filePro on the database while trying to read it from Python.
+Which wont happen because you're working on a disposable copy, right?
+* It only reads from filePro databases, it does not write to them.
+* It slurps the entire database into memory.  It may choke on giant sets.
+OTOH, I don't expect there are a lot of giant filePro sets.
+* The folder you pass must contain a 'map', 'key', and 'data' file -- with
+lowercase names.  It will bomb on an empty folder.
+* The MAP file cannot be an Alien pointer (for reading external ASCII files?).
+* This code is not highly tested.  I worked on it until I got all my files
+converted.
+
+
+=== The Source Files ===
+
+read_filepro/fpmap.py - the FPMap class used to open MAP files.
+read_filepro/fpkey.py - the FPKey class used to open KEY files.
+read_filepro/fpdata.py - the FPData class used to open DATA files.
+read_filepro/fpdatabase - the FPDatabase class that wraps the three previous
+classes to open an entire filePro database.
+
+Using FPDatabase is pretty simple.  Just pass it one argument, the path of the
+directory containing a filePro database:
+    
+    from read_filepro import FPDatabase
+    db = FPDatabase('/tmp/appl/filepro/A_DATABASE')
+
+
+=== FPDatabase Methods ===
+
+* db.get_field_count() - returns number of fields in the table    
+* db.get_field_names() - returns the names of the fields, in column order
+* db.get_field_types() - guesses the value type, either 'string' or 'numeric'
+
+* db.get_total_record_count() - returns number of records in table, including
+deleted
+* db.get_active_record_count() - returns number of active/non-deleted records
+* db.get_deleted_record_count() - returns number of deleted records 
+
+The following methods return a Python list object containing records. Each
+record is a Python list object containing strings for every column value.
+
+* db.get_all_records() - returns a list of all records; active + deleted.
+* db.get_active_records() - returns a list of non-deleted records
+* db.get_deleted_records() - returns a list of deleted records.
+
+* db.is_deleted(index) - returns true if index value is a deleted record.
+* db.get_record(index) - returns the record at index as a Python list.
+* db.get_record_dict(index) - returns the record at index as a Python 
+dictionary where key = field name and value = column value.
+
+=== Batch Convert ===
+
+I used the script 'batch_convert.py' to mass convert the filePro databases
+into Comma Separated Value (CSV) files.  You'll need to edit it and set
+values for APPL_PATH and CSV_PATH .  I had to delete a couple source folders
+with 'Alien' map files and one empty directory (working from disposable 
+copies of course).  It adds a timestamp to the filename, so running it over
+and over produces additional files.
+
+Good luck!
+
