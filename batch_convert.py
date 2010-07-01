@@ -64,10 +64,10 @@ if __name__ == '__main__':
     names = os.listdir(APPL_PATH)
     names.sort() 
     for name in names:
-        target = os.path.join(APPL_PATH, name)
-        if os.path.isdir(target):
-            print target
-            filepro_to_csv(target, CVS_PATH)
+        source = os.path.join(APPL_PATH, name)
+        if os.path.isdir(source):
+            print source
+            filepro_to_csv(source, CVS_PATH)
     
         
 
