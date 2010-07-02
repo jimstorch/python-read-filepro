@@ -20,7 +20,6 @@ In other words; halt Filepro, copy the data files, use on the copies.
 
 import os
 import sys
-import string
 
 
 class FPData(object):
@@ -54,8 +53,8 @@ class FPData(object):
             print("See the README on DOS/UNIX linefeeds for possible fix.")
             sys.exit(1)            
 
+        ## Construct a list of slice points by field widths
         cuts = []
-        ## Get the fields from the map file
         for field in fpmap.data_fields:
             ## Filter out reserved/dummy fields with 0 width
             if field[1]:
@@ -68,8 +67,11 @@ class FPData(object):
             data = key_fp.read(_record_length)
             if len(data) == 0:
                 break
+
+            #print data
             row = []
             last_cut = 0
+            ## Slice out field values
             for cut in cuts:
                 row.append(data[last_cut:last_cut + cut].strip())
                 last_cut += cut

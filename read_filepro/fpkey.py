@@ -20,7 +20,7 @@ In other words; halt Filepro, copy the data files, use on the copies.
 
 import os
 import sys
-import string
+
 
 _FILEPRO_HEADER_SIZE = 20
 
@@ -37,11 +37,6 @@ class FPKey(object):
         self.deleted_records = 0
 
         _record_length = fpmap.key_record_length + _FILEPRO_HEADER_SIZE
-
-        ## Check that the KEY file actually has records
-        if _record_length == 0:
-            return
-
         fname = os.path.join(folder, 'key')
 
         ## I have files that were copied from SCO Unix to Windows to Linux
@@ -55,8 +50,8 @@ class FPKey(object):
             print("See the README on DOS/UNIX linefeeds for possible fix.")
             sys.exit(1)            
 
+        ## Construct a list of slice points by field widths
         cuts = []
-        ## Get the fields from the map file
         for field in fpmap.key_fields:
             ## Filter out reserved/dummy fields with 0 width
             if field[1]:
@@ -73,7 +68,7 @@ class FPKey(object):
 
             ## Filepro uses a 20 byte preamble/header on key records
             ## Header offset 0 == 0x00 for deleted record, 0x01 for active.
-            deleted = bool(ord(block[0]) == 0x00)
+            deleted = not bool(ord(block[0]))
             self.deletes.append(deleted)
             if not deleted:
                 count_active += 1                                 
@@ -82,6 +77,7 @@ class FPKey(object):
             #print data
             row = []
             last_cut = 0
+            ## Slice out field values
             for cut in cuts:
                 row.append(data[last_cut:last_cut + cut].strip())
                 last_cut += cut
