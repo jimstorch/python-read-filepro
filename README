@@ -1,4 +1,4 @@
-# read_filepro for Python
+= read_filepro for Python =
 
 Python source for extracting map, key, and data records from an ancient filePro 
 database. Reads the raw files so a copy of filePro is not required. 
@@ -10,7 +10,7 @@ Contact info: jimstorch then that amper thingy symbol then gmail and then the
 TLD for commercial entities.
 
 
-## Background
+== Background ==
 
 FIRST: Copy your data and only work with a disposable copy!
 
@@ -75,7 +75,7 @@ Ref: https://www.fptech.com/Products/Docs/FPFormat/ftmap.shtml
 
 === Key Files ===
 
-The KEY file is a flat file.  It should always be recount_count * record_size
+The KEY file is a flat file.  It should always be record_count * record_size
 long.  The record size is the width of all the key fields plus a 20 byte
 'deleted' and 'used' headers. 
 
@@ -87,8 +87,8 @@ The database column in the KEY file are apparently those that filePro has built
 indexes for.  All other columns are stored in the DATA file.  It is possible
 for all columns to be in KEY and have a DATA file 0 bytes long.
 
-Filepro does not shrink the file as you deleted records.  It maintains a
-chain of deleted records as uses those as slots for saving new ones. 
+Filepro does not shrink the file as you delete records.  It maintains a
+chain of deleted records and uses those as slots for saving new ones. 
        
 Ref: https://www.fptech.com/Products/Docs/FPFormat/ftkey.shtml
 
