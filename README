@@ -1,4 +1,4 @@
-= read_filepro for Python =
+=read_filepro for Python=
 
 Python source for extracting map, key, and data records from an ancient filePro 
 database. Reads the raw files so a copy of filePro is not required. 
